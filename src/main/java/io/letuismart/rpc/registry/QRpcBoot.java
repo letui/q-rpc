@@ -1,6 +1,5 @@
 package io.letuismart.rpc.registry;
 
-import com.google.gson.Gson;
 import io.letuismart.rpc.spec.RpcMethod;
 import io.letuismart.rpc.spec.RpcScan;
 import io.letuismart.rpc.spec.RpcService;
@@ -34,38 +33,40 @@ import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+import static io.letuismart.rpc.spec.SpecEnum.Q_BEAN;
+import static io.letuismart.rpc.spec.SpecEnum.Q_METHOD;
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
-import static io.letuismart.rpc.spec.SpecEnum.*;
 
 public final class QRpcBoot extends ChannelInitializer<SocketChannel> {
 
     private QRpcBoot() {
+    }
+
+    private final static QRpcBoot qRpcBoot=new QRpcBoot();
+    private final static HashMap<String, QRpcDescribe> qRpcMap = new HashMap<String, QRpcDescribe>();
+
+    private static SslContext sslCtx;
+    private static Class entryClass;
+    private static boolean ssl=false;
+    private static int port=9079;
+
+    public static void run(Class entry, String[] args) throws Exception {
         try {
-            scanRpcService();
+            entryClass=entry;
+            qRpcBoot.scanRpcService();
         } catch (IllegalAccessException e) {
             e.printStackTrace();
         } catch (InstantiationException e) {
             e.printStackTrace();
         }
-    }
-
-    private final static HashMap<String, QRpcDescribe> qRpcMap = new HashMap<String, QRpcDescribe>();
-    private static SslContext sslCtx;
-    private static Class entryClass;
-
-    public static void run(Class entry, String[] args) throws Exception {
-        entryClass = entry;
-        final boolean SSL = System.getProperty("ssl") != null;
-        final int PORT = Integer.parseInt(System.getProperty("port", SSL ? "8443" : "8080"));
         // Configure SSL.
-        if (SSL) {
+        if (ssl) {
             SelfSignedCertificate ssc = new SelfSignedCertificate();
             sslCtx = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey()).build();
         } else {
             sslCtx = null;
         }
-        // Configure the server.
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
@@ -73,8 +74,8 @@ public final class QRpcBoot extends ChannelInitializer<SocketChannel> {
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
                     .handler(new LoggingHandler(LogLevel.ERROR))
-                    .childHandler(new QRpcBoot());
-            Channel ch = b.bind(PORT).sync().channel();
+                    .childHandler(qRpcBoot);
+            Channel ch = b.bind(port).sync().channel();
             ch.closeFuture().sync();
         } finally {
             bossGroup.shutdownGracefully();
@@ -113,11 +114,11 @@ public final class QRpcBoot extends ChannelInitializer<SocketChannel> {
                     ByteBuf content = httpContent.content();
                     if (msg instanceof LastHttpContent) {
                         String reqBody = content.toString(Charset.forName("utf-8"));
+                        System.out.println(reqBody+" -----");
                         FullHttpResponse fullHttpResponse = callRpcService(qBean, qMethod, reqBody);
                         channelHandlerContext.writeAndFlush(fullHttpResponse);
                     }
                 }
-
             }
         });
     }
@@ -157,6 +158,8 @@ public final class QRpcBoot extends ChannelInitializer<SocketChannel> {
 
 
     public FullHttpResponse callRpcService(String qBean, String qMethod, String reqBody) {
+
+
         QRpcDescribe rpcDescribe = qRpcMap.get(qBean);
         Object rpcBeanInstance = rpcDescribe.getRpcBeanInstance();
         Map<String, Parameter[]> methodDefDetail = rpcDescribe.getRpcMethods().get(qMethod);
@@ -170,7 +173,6 @@ public final class QRpcBoot extends ChannelInitializer<SocketChannel> {
             Method rpcMethod = rpcBeanInstance.getClass().getMethod(qMethod,methodParamsClass);
             Object[] convertParams = new ParamsConverter().convert(reqBody, rpcMethodParamsType);
             Object invokedValue = rpcMethod.invoke(rpcBeanInstance, convertParams);
-            System.out.println(invokedValue);
             String repsonseBody=String.valueOf(invokedValue);
             FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, OK,
                     Unpooled.copiedBuffer(repsonseBody, CharsetUtil.UTF_8));

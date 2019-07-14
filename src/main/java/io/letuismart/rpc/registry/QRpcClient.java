@@ -54,7 +54,7 @@ public final class QRpcClient extends SimpleChannelInboundHandler<HttpObject> {
 
     private final static QRpcClient client = new QRpcClient();
 
-    static final String URL = System.getProperty("url", "http://127.0.0.1:8080/");
+    static final String URL = System.getProperty("url", "http://127.0.0.1:9079/");
 
     private ThreadLocal<String> responseBody = new ThreadLocal<>();
 
@@ -83,8 +83,6 @@ public final class QRpcClient extends SimpleChannelInboundHandler<HttpObject> {
                         i++;
                     }
                     String response = call(qBean, qMethod, qParam);
-                    //
-
                     return new ReturnConverter().convert(response, method.getReturnType());
                 }
             });
@@ -158,7 +156,9 @@ public final class QRpcClient extends SimpleChannelInboundHandler<HttpObject> {
             request.headers().set(Q_BEAN.val(), qBean);
             request.headers().set(Q_METHOD.val(), qMethod);
             Gson gson=new Gson();
-            ((DefaultFullHttpRequest) request).content().writeBytes(gson.toJson(params).getBytes());
+            String reqBody=gson.toJson(params);
+            ((DefaultFullHttpRequest) request).content().writeBytes(reqBody.getBytes());
+            request.headers().set(HttpHeaderNames.CONTENT_LENGTH, reqBody.getBytes().length);
             // Send the HTTP request.
             ch.writeAndFlush(request);
             while (responseBody.get() == null) {

@@ -17,7 +17,8 @@ public class ModelRpcService implements ModelRpcClient {
     @Override
     @RpcMethod()
     public String sayHello2(@RpcParam("apf") String apf){
-        System.out.println("XX2");
+        System.out.println("XX2"+Thread.currentThread().getId());
+
         return  apf;
     }
 }
