@@ -117,6 +117,7 @@ public final class QRpcBoot extends ChannelInitializer<SocketChannel> {
                         System.out.println(reqBody+" -----");
                         FullHttpResponse fullHttpResponse = callRpcService(qBean, qMethod, reqBody);
                         channelHandlerContext.writeAndFlush(fullHttpResponse);
+                        channelHandlerContext.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
                     }
                 }
             }
