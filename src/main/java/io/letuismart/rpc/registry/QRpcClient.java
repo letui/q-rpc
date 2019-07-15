@@ -16,6 +16,7 @@
 package io.letuismart.rpc.registry;
 
 import com.google.gson.Gson;
+import io.letuismart.rpc.exception.BuildClientException;
 import io.letuismart.rpc.exception.NotFoundRpcParamException;
 import io.letuismart.rpc.exception.UnsupportException;
 import io.letuismart.rpc.spec.RpcClient;
@@ -72,7 +73,7 @@ public final class QRpcClient {
             });
             return (T) proxy;
         }
-        return null;
+        throw new BuildClientException("[RpcClient] is not interface or not found @RpcClient annotation");
     }
 
     private static String call(String qBean, String qMethod, Map<String, String> params) throws Exception {
